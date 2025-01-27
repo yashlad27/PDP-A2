@@ -113,6 +113,9 @@ public class JsonValidator implements JsonParser<String> {
         expectingKey = stack.peek() == '{';
       } else if (c == '}' || c == ']') {
         closeStructure(c);
+      } else if (c == '[') {
+        stack.push(c);
+        expectingCommaOrEnd = false;
       } else if (c == '\"') {
         inString = true;
         expectingCommaOrEnd = false;
