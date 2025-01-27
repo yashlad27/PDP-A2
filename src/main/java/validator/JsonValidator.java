@@ -5,6 +5,9 @@ import java.util.Stack;
 import parser.InvalidJsonException;
 import parser.JsonParser;
 
+/**
+ *
+ */
 public class JsonValidator implements JsonParser<String> {
 
   private Stack<Character> stack;
@@ -22,7 +25,9 @@ public class JsonValidator implements JsonParser<String> {
   // Tracks the current status
   private String status;
 
-  // Constructor to initialize state
+  /**
+   *
+   */
   public JsonValidator() {
     this.stack = new Stack<>();
     this.inString = false;
