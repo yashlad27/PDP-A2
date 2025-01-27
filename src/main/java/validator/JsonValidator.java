@@ -167,7 +167,7 @@ public class JsonValidator implements JsonParser<String> {
       this.status = "Status:Invalid";
     } else if (stack.isEmpty() && !inString && !expectingKey && !expectingColon) {
       this.status = "Status:Valid";
-    } else if (stack.isEmpty() && !inString) {
+    } else if (stack.isEmpty() || !inString || expectingKey || expectingColon || expectingCommaOrEnd) {
       this.status = "Status:Incomplete";
     }
   }

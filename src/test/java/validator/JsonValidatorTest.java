@@ -37,7 +37,6 @@ public class JsonValidatorTest {
 
   @Test
   public void testIncompleteJson() throws InvalidJsonException {
-    // Test incomplete JSON object
     jsonValidator.input('{').input('"').input('k').input('"').input(':');
     assertEquals("Status:Incomplete", jsonValidator.output());
   }
