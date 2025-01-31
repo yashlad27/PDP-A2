@@ -6,27 +6,25 @@ import parser.InvalidJsonException;
 import parser.JsonParser;
 
 /**
- *
+ * Validator Class to check JSON syntax.
  */
 public class JsonValidator implements JsonParser<String> {
 
   private Stack<Character> stack;
 
-  // Flags for context
   private boolean inString;
   private boolean escapeNext;
   private boolean isInvalid;
 
-  // States to track expected elements
   private boolean expectingKey;
   private boolean expectingColon;
   private boolean expectingCommaOrEnd;
+  private boolean insideArray;
 
-  // Tracks the current status
   private String status;
 
   /**
-   *
+   * Constructs variables required for syntax checking.
    */
   public JsonValidator() {
     this.stack = new Stack<>();
@@ -36,6 +34,7 @@ public class JsonValidator implements JsonParser<String> {
     this.expectingKey = true;
     this.expectingColon = false;
     this.expectingCommaOrEnd = false;
+    this.insideArray = false;
     this.status = "Status:Empty";
   }
 
@@ -89,61 +88,107 @@ public class JsonValidator implements JsonParser<String> {
    * @param c the input character
    * @throws InvalidJsonException if the input causes structural issues
    */
+
   private void handleGeneralContext(char c) throws InvalidJsonException {
     if (Character.isWhitespace(c)) {
       return;
     }
 
     if (expectingKey) {
-      if (c == '{') {
-        stack.push(c);
-        expectingKey = true;
-      } else if (c == '"') {
-        inString = true;
-        expectingKey = false;
-        expectingColon = true;
-      } else {
-        throw new InvalidJsonException("Expected key enclosed in double quotes. Found: " + c);
-      }
+      handleExpectingKey(c);
     } else if (expectingColon) {
-      if (c == ':') {
-        expectingColon = false;
-        expectingCommaOrEnd = true;
-      } else {
-        throw new InvalidJsonException("Expected ':' after key. Found: " + c);
-      }
+      handleExpectingColon(c);
     } else if (expectingCommaOrEnd) {
-      if (c == ',') {
-        expectingCommaOrEnd = false;
-        expectingKey = stack.peek() == '{';
-      } else if (c == '}' || c == ']') {
+      handleExpectingCommaOrEnd(c);
+    } else {
+      handleDefaultContext(c);
+    }
+  }
+
+  private void handleExpectingKey(char c) throws InvalidJsonException {
+    if (c == '\"') {
+      inString = true;
+      expectingKey = false;
+      expectingColon = true;
+    } else if (c == '{') {
+      stack.push(c);
+      expectingKey = true;
+    } else if (c == '[') {
+      stack.push(c);
+      insideArray = true;
+      expectingCommaOrEnd = false;
+    } else if (c == ',') {
+      stack.push(c);
+      expectingCommaOrEnd = false;
+    } else if (c == '}' || c == ']') {
+      if (!stack.isEmpty() && ((c == ']' && stack.peek() == '[') || (c == '}'
+              && stack.peek() == '{'))) {
         closeStructure(c);
-      } else if (c == '[') {
-        stack.push(c);
-        expectingCommaOrEnd = false;
-      } else if (c == '\"') {
-        inString = true;
-        expectingCommaOrEnd = false;
+        expectingCommaOrEnd = !stack.isEmpty();
       } else {
-        throw new InvalidJsonException("Expected ',' or closing brace/bracket. Found: " + c);
+        throw new InvalidJsonException("Mismatched closing character: " + c);
       }
     } else {
-      switch (c) {
-        case '{':
-        case '[':
-          stack.push(c);
-          expectingKey = c == '{';
-          break;
-        case '}':
-        case ']':
-          closeStructure(c);
-          break;
-        case '"':
-          inString = true;
-          break;
-        default:
-          throw new InvalidJsonException("Unexpected character: " + c);
+      throw new InvalidJsonException("Expected key enclosed in double quotes. Found: " + c);
+    }
+  }
+
+  private void handleExpectingColon(char c) throws InvalidJsonException {
+    if (c == ':') {
+      expectingColon = false;
+      expectingCommaOrEnd = true;
+    } else {
+      throw new InvalidJsonException("Expected ':' after key. Found: " + c);
+    }
+  }
+
+  private void handleExpectingCommaOrEnd(char c) throws InvalidJsonException {
+    if (c == ',') {
+      expectingCommaOrEnd = false;
+      if (stack.peek() == '{') {
+        expectingKey = true;
       }
+    } else if (c == ']') {
+      closeStructure(c);
+      expectingCommaOrEnd = !stack.isEmpty() && stack.peek() == '[';
+      insideArray = false;
+    } else if (c == '}') {
+      closeStructure(c);
+      expectingCommaOrEnd = !stack.isEmpty();
+    } else if (c == '[') {
+      stack.push(c);
+      expectingCommaOrEnd = false;
+    } else if (c == '\"') {
+      inString = true;
+      expectingCommaOrEnd = false;
+    } else {
+      throw new InvalidJsonException("Expected comma or end of closed string. Found: " + c);
+    }
+  }
+
+  private void handleDefaultContext(char c) throws InvalidJsonException {
+    switch (c) {
+      case '{':
+      case '[':
+        stack.push(c);
+        expectingKey = true;
+        break;
+      case '}':
+      case ']':
+        closeStructure(c);
+        expectingKey = !stack.isEmpty();
+        break;
+      case ',':
+        if (stack.isEmpty() || (stack.peek() != '{' && stack.peek() != '[')) {
+          throw new InvalidJsonException("Unexpected comma outside of structure.");
+        }
+        expectingCommaOrEnd = false;
+        break;
+      case '\"':
+        inString = true;
+        break;
+      default:
+        throw new InvalidJsonException("Unexpected character: " + c);
     }
   }
 
@@ -164,16 +209,28 @@ public class JsonValidator implements JsonParser<String> {
     expectingCommaOrEnd = !stack.isEmpty();
   }
 
+  private boolean isEmptyStructure() {
+    return stack.isEmpty() && !inString && !expectingKey && !expectingColon
+            && !expectingCommaOrEnd && !insideArray;
+  }
+
+  private boolean checkIncompleteStructure() {
+    return !stack.isEmpty() || inString || expectingKey || expectingColon
+            || expectingCommaOrEnd || insideArray;
+  }
+
   /**
    * Update the current status of the parser.
    */
   private void updateStatus() {
     if (isInvalid) {
       this.status = "Status:Invalid";
-    } else if (stack.isEmpty() && !inString && !expectingKey && !expectingColon) {
+    } else if (isEmptyStructure()) {
       this.status = "Status:Valid";
-    } else if (stack.isEmpty() || !inString || expectingKey || expectingColon || expectingCommaOrEnd) {
+    } else if (checkIncompleteStructure()) {
       this.status = "Status:Incomplete";
+    } else {
+      this.status = "Status:Empty";
     }
   }
 
