@@ -20,6 +20,7 @@ public class JsonValidator implements JsonParser<String> {
   private boolean expectingColon;
   private boolean expectingCommaOrEnd;
   private boolean insideArray;
+  private boolean commaCheck;
 
   private String status;
 
@@ -35,6 +36,7 @@ public class JsonValidator implements JsonParser<String> {
     this.expectingColon = false;
     this.expectingCommaOrEnd = false;
     this.insideArray = false;
+    this.commaCheck = false;
     this.status = "Status:Empty";
   }
 
@@ -126,6 +128,7 @@ public class JsonValidator implements JsonParser<String> {
   private void handleExpectingCommaOrEnd(char c) throws InvalidJsonException {
     if (c == ',') {
       expectingCommaOrEnd = false;
+      commaCheck = true;
       if (stack.peek() == '{') {
         expectingKey = true;
       } else {
@@ -159,6 +162,7 @@ public class JsonValidator implements JsonParser<String> {
         stack.push(c);
         expectingKey = (c == '{');
         insideArray = (c == '[');
+        commaCheck = false;
         break;
       case '}':
       case ']':
@@ -167,9 +171,12 @@ public class JsonValidator implements JsonParser<String> {
         break;
       case '\"':
         inString = true;
+        commaCheck = false;
         break;
       default:
         if (insideArray) {
+          commaCheck = false;
+          expectingCommaOrEnd = true;
           break;
         }
         throw new InvalidJsonException("Unexpected character: " + c);
@@ -190,17 +197,11 @@ public class JsonValidator implements JsonParser<String> {
     if ((c == '}' && expected != '{') || (c == ']' && expected != '[')) {
       throw new InvalidJsonException("Mismatched closing character: " + c);
     }
+    if (commaCheck) {
+      throw new InvalidJsonException("Mismatch comma after closing character: " + c);
+    }
     insideArray = !stack.isEmpty() && stack.peek() == '[';
-  }
-
-  private boolean isEmptyStructure() {
-    return stack.isEmpty() && !inString && !expectingKey && !expectingColon
-            && !expectingCommaOrEnd && !insideArray;
-  }
-
-  private boolean checkIncompleteStructure() {
-    return !stack.isEmpty() || inString || expectingKey || expectingColon
-            || expectingCommaOrEnd || insideArray;
+    commaCheck = false;
   }
 
   /**
@@ -221,9 +222,11 @@ public class JsonValidator implements JsonParser<String> {
       inString = true;
       expectingKey = false;
       expectingColon = true;
+      commaCheck = false;
     } else if (c == '{') {
       stack.push(c);
       expectingKey = true;
+      commaCheck = false;
     } else if (c == '}') {
       closeStructure(c);
       expectingCommaOrEnd = !stack.isEmpty();
@@ -231,6 +234,7 @@ public class JsonValidator implements JsonParser<String> {
       stack.push(c);
       insideArray = true;
       expectingKey = false;
+      commaCheck = false;
     } else {
       throw new InvalidJsonException("Expected key enclosed in double quotes. Found: " + c);
     }

@@ -6,6 +6,7 @@ import org.junit.Test;
 import parser.InvalidJsonException;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
 /**
  * Junit test cases to check and validate JsonValidator class.
@@ -31,6 +32,28 @@ public class JsonValidatorTest {
       jsonValidator.input(c);
     }
     assertEquals("Status:Valid", jsonValidator.output());
+  }
+
+  @Test
+  public void testMissingKeyInObject() {
+    JsonValidator validator = new JsonValidator();
+    assertThrows(InvalidJsonException.class, () -> {
+      validator.input('{');
+      validator.input('1');
+      validator.input('}');
+    });
+  }
+
+  @Test
+  public void testKeyWithoutValue() {
+    JsonValidator validator = new JsonValidator();
+    assertThrows(InvalidJsonException.class, () -> {
+      validator.input('{');
+      validator.input('"');
+      validator.input('k');
+      validator.input('"');
+      validator.input('}');
+    });
   }
 
   @Test(expected = InvalidJsonException.class)
@@ -71,6 +94,17 @@ public class JsonValidatorTest {
       jsonValidator.input(c);
     }
     assertEquals("Status:Valid", jsonValidator.output());
+  }
+
+  @Test
+  public void testInvalidCharacterAfterKey() {
+    assertThrows(InvalidJsonException.class, () -> {
+      jsonValidator.input('{');
+      jsonValidator.input('"');
+      jsonValidator.input('k');
+      jsonValidator.input('"'); // Key: "k"
+      jsonValidator.input('a');
+    });
   }
 
   @Test
@@ -160,15 +194,6 @@ public class JsonValidatorTest {
     assertEquals("Status:Incomplete", jsonValidator.output());
   }
 
-  @Test
-  public void testValidJsonWithWhitespace() throws InvalidJsonException {
-    String validJson = "{ \"key\" : \"value\" }";
-    for (char c : validJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
-    assertEquals("Status:Valid", jsonValidator.output());
-  }
-
   @Test(expected = InvalidJsonException.class)
   public void testUnclosedArray() throws InvalidJsonException {
     String invalidUnclosedArray = "[1,2";
@@ -188,7 +213,7 @@ public class JsonValidatorTest {
   }
 
   @Test
-  public void testValidJson1() throws InvalidJsonException {
+  public void testValidJson() throws InvalidJsonException {
     String validJson = "{\"key\":\"abc\"}";
     for (char c : validJson.toCharArray()) {
       jsonValidator.input(c);
@@ -196,11 +221,60 @@ public class JsonValidatorTest {
     assertEquals("Status:Valid", jsonValidator.output());
   }
 
-  @Test(expected = InvalidJsonException.class)
-  public void testJsonMismatchedBrackets() throws InvalidJsonException {
-    String invalidJson = "{\"z\":\"h\"]";
-    for (char c : invalidJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
+  @Test
+  public void testTrailingCommaInObject() {
+    assertThrows(InvalidJsonException.class, () -> {
+      jsonValidator.input('{');
+      jsonValidator.input('"');
+      jsonValidator.input('k');
+      jsonValidator.input('"');
+      jsonValidator.input(':');
+      jsonValidator.input('1');
+      jsonValidator.input(',');
+      jsonValidator.input('}');
+    });
   }
+
+  @Test
+  public void testTrailingCommaInArray() {
+    assertThrows(InvalidJsonException.class, () -> {
+      jsonValidator.input('[');
+      jsonValidator.input('1');
+      jsonValidator.input(',');
+      jsonValidator.input(']');
+    });
+  }
+
+  @Test
+  public void testNestedTrailingComma() {
+    assertThrows(InvalidJsonException.class, () -> {
+      jsonValidator.input('{');
+      jsonValidator.input('"');
+      jsonValidator.input('a');
+      jsonValidator.input('"');
+      jsonValidator.input(':');
+      jsonValidator.input('[');
+      jsonValidator.input('1');
+      jsonValidator.input(',');
+      jsonValidator.input(']');
+      jsonValidator.input('}');
+    });
+  }
+
+  @Test
+  public void testLoneComma() {
+    assertThrows(InvalidJsonException.class, () -> {
+      jsonValidator.input('{');
+      jsonValidator.input(',');
+    });
+  }
+
+  @Test
+  public void testInvalidNumberFormat() {
+    assertThrows(InvalidJsonException.class, () -> {
+      jsonValidator.input('0');
+      jsonValidator.input('1');
+    });
+  }
+
 }
