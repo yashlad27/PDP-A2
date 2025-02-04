@@ -6,7 +6,13 @@ import parser.InvalidJsonException;
 import parser.JsonParser;
 
 /**
- * Validator Class to check JSON syntax.
+ * A Json syntax validator that checks input characters for compliance with JSON standards.
+ * including proper structure, key formatting, and nesting. It tracks the parser state to determine
+ * validity and throws exceptions for syntax errors.
+ * <p>
+ * Validator is using a stack based approach to manage nested structures
+ * and boolean flags to track different context states.
+ * </p>
  */
 public class JsonValidator implements JsonParser<String> {
 
@@ -25,7 +31,10 @@ public class JsonValidator implements JsonParser<String> {
   private String status;
 
   /**
-   * Constructs variables required for syntax checking.
+   * Constructs a new JSON validator and initialises it's iternal state.
+   * <p>
+   * Initialises the stack for tracking structures and resets all boolean flags.
+   * </p>
    */
   public JsonValidator() {
     this.stack = new Stack<>();
@@ -68,9 +77,25 @@ public class JsonValidator implements JsonParser<String> {
   }
 
   /**
-   * Validates final state of JSON parser.
+   * Provide the output of the parser, given all the inputs it has been provided so far.
    *
-   * @throws InvalidJsonException throws exception when structure is not closed.
+   * @return One of:
+   * <ul>
+   *   <li>`Status:Empty` - no input processed yet.</li>
+   *   <li>`Status:Valid` - input is valid and complete JSON.</li>
+   *   <li>`Status:Incomplete` - Input is valid but incomplete.</li>
+   *   <li>`Status:Invalid` - Input contains syntax errors.</li>
+   * </ul>
+   */
+  @Override
+  public String output() {
+    return status;
+  }
+
+  /**
+   * Validates that all JSON structures are properly closed after processing input.
+   *
+   * @throws InvalidJsonException If unclosed structures remain ( unmatched `{` or `[` ).
    */
   public void validateFinalState() throws InvalidJsonException {
     if (!stack.isEmpty()) {
@@ -79,10 +104,10 @@ public class JsonValidator implements JsonParser<String> {
   }
 
   /**
-   * Handle characters when inside a string context.
+   * Handle characters when inside a JSON string i.e. escaped characters and closing quotes.
    *
    * @param c the input character
-   * @throws InvalidJsonException if the string is invalid
+   * @throws InvalidJsonException if an invalid escape sequence is detected.
    */
   private void handleStringContext(char c) throws InvalidJsonException {
     if (escapeNext) {
@@ -91,14 +116,17 @@ public class JsonValidator implements JsonParser<String> {
       escapeNext = true;
     } else if (c == '"') {
       inString = false;
+      if (!expectingKey) {
+        expectingCommaOrEnd = true;
+      }
     }
   }
 
   /**
-   * Handle characters in the general JSON context.
+   * Handle characters outside of strings.
    *
-   * @param c the input character
-   * @throws InvalidJsonException if the input causes structural issues
+   * @param c the input character.
+   * @throws InvalidJsonException if the input causes structural issues.
    */
   private void handleGeneralContext(char c) throws InvalidJsonException {
     if (Character.isWhitespace(c)) {
@@ -116,45 +144,81 @@ public class JsonValidator implements JsonParser<String> {
     }
   }
 
+  /**
+   * Validates that a colon : follows a key in an object.
+   *
+   * @param c the input character.
+   * @throws InvalidJsonException if the character is not a colon.
+   */
   private void handleExpectingColon(char c) throws InvalidJsonException {
     if (c == ':') {
       expectingColon = false;
-      expectingCommaOrEnd = true;
+    } else if (c == ',') {
+      expectingColon = false;
+      expectingKey = true;
     } else {
       throw new InvalidJsonException("Expected ':' after key. Found: " + c);
     }
   }
 
+  /**
+   * Handles characters when a comma or closing brace is expected after a value.
+   *
+   * @param c the input character.
+   * @throws InvalidJsonException for:
+   *                              <ul>
+   *                                <li>unexpected commas.</li>
+   *                                <li>trailing commas before closing braces.</li>
+   *                                <li>invalid characters in the context.</li>
+   *                              </ul>
+   */
   private void handleExpectingCommaOrEnd(char c) throws InvalidJsonException {
     if (c == ',') {
-      expectingCommaOrEnd = false;
-      commaCheck = true;
-      if (stack.peek() == '{') {
+      if (stack.isEmpty()) {
+        throw new InvalidJsonException("Unexpected comma.");
+      }
+      char top = stack.peek();
+      if (top == '{') {
+        expectingCommaOrEnd = false;
+        commaCheck = true;
         expectingKey = true;
+      } else if (top == '[') {
+        expectingCommaOrEnd = false;
+        commaCheck = true;
       } else {
-        stack.peek();
+        throw new InvalidJsonException("Unexpected comma.");
       }
     } else if (c == ']' || c == '}') {
+      if (commaCheck) {
+        throw new InvalidJsonException("Trailing comma before closing: " + c);
+      }
       closeStructure(c);
       expectingCommaOrEnd = !stack.isEmpty();
       insideArray = !stack.isEmpty() && stack.peek() == '[';
-    } else if (c == '{') {
+    } else if (c == '{' || c == '[') {
       stack.push(c);
-      expectingKey = true;
+      expectingKey = (c == '{');
       expectingCommaOrEnd = false;
-    } else if (c == '[') {
-      stack.push(c);
-      insideArray = true;
-      expectingCommaOrEnd = false;
-    } else if (c == '\"') {
+      insideArray = (c == '[');
+    } else if (c == '"') {
       inString = true;
+      commaCheck = false;
       expectingCommaOrEnd = false;
     } else {
-      throw new InvalidJsonException("Expected comma, closing bracket, or new structure. Found: "
-              + c);
+      throw new InvalidJsonException("Expected comma, closing bracket, or new structure. Found: " + c);
     }
   }
 
+  /**
+   * Handles characters in default context i.e. structural tokens and values in arrays.
+   *
+   * @param c the input character
+   * @throws InvalidJsonException For:
+   *                              <ul>
+   *                                <li>Unexpected characters outside arrays.</li>
+   *                                <li>Mismatched closing brackets.</li>
+   *                              </ul>
+   */
   private void handleDefaultContext(char c) throws InvalidJsonException {
     switch (c) {
       case '{':
@@ -184,10 +248,14 @@ public class JsonValidator implements JsonParser<String> {
   }
 
   /**
-   * Close a structure and validate the stack.
+   * Close a structure (object or array) and validates the stack state.
    *
-   * @param c the closing character
-   * @throws InvalidJsonException if the structure is mismatched
+   * @param c the closing character ( } or ] ).
+   * @throws InvalidJsonException For:
+   *                              <ul>
+   *                                <li>Mismatched closing characters for an array.</li>
+   *                                <li>Trailing commas before closure.</li>
+   *                              </ul>
    */
   private void closeStructure(char c) throws InvalidJsonException {
     if (stack.isEmpty()) {
@@ -210,6 +278,7 @@ public class JsonValidator implements JsonParser<String> {
   private void updateStatus() {
     if (isInvalid) {
       status = "Status:Invalid";
+      return;
     } else if (stack.isEmpty() && !inString && !expectingKey && !expectingColon) {
       status = "Status:Valid";
     } else {
@@ -217,36 +286,40 @@ public class JsonValidator implements JsonParser<String> {
     }
   }
 
+  /**
+   * Handles the characters when a key is expected in an object.
+   *
+   * @param c the input character.
+   * @throws InvalidJsonException For:
+   *                              <ul>
+   *                                <li>Unquoted Numeric keys.</li>
+   *                                <li>Unexpected commmas or brackets.</li>
+   *                              </ul>
+   */
   private void handleExpectingKey(char c) throws InvalidJsonException {
     if (c == '\"') {
       inString = true;
       expectingKey = false;
       expectingColon = true;
-      commaCheck = false;
+    } else if (Character.isDigit(c)) {
+      throw new InvalidJsonException("Invalid key: JSON keys must start with a letter. Found: " + c);
     } else if (c == '{') {
       stack.push(c);
       expectingKey = true;
-      commaCheck = false;
-    } else if (c == '}') {
-      closeStructure(c);
-      expectingCommaOrEnd = !stack.isEmpty();
     } else if (c == '[') {
       stack.push(c);
       insideArray = true;
-      expectingKey = false;
-      commaCheck = false;
+      expectingCommaOrEnd = false;
+    } else if (c == ']' || c == '}') {
+      if (!stack.isEmpty() && ((c == ']' && stack.peek() == '[') || (c == '}' && stack.peek() == '{'))) {
+        closeStructure(c);
+        insideArray = (c == ']') ? false : insideArray;
+        expectingCommaOrEnd = !stack.isEmpty();
+      } else {
+        throw new InvalidJsonException("Mismatched or unexpected closing character: " + c);
+      }
     } else {
       throw new InvalidJsonException("Expected key enclosed in double quotes. Found: " + c);
     }
-  }
-
-  /**
-   * Provide the output of the parser, given all the inputs it has been provided so far.
-   *
-   * @return the output of the parser
-   */
-  @Override
-  public String output() {
-    return status;
   }
 }

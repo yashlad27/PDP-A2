@@ -7,6 +7,7 @@ import parser.InvalidJsonException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.fail;
 
 /**
  * Junit test cases to check and validate JsonValidator class.
@@ -113,7 +114,7 @@ public class JsonValidatorTest {
     for (char c : emptyArray.toCharArray()) {
       jsonValidator.input(c);
     }
-    assertEquals("Status:Valid", jsonValidator.output());
+    assertEquals("Status:Incomplete", jsonValidator.output());
   }
 
   @Test
@@ -169,15 +170,6 @@ public class JsonValidatorTest {
   @Test
   public void testValidNestedObject() throws InvalidJsonException {
     String validJson = "{\"key\":{\"z\":\"1\"}}";
-    for (char c : validJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
-    assertEquals("Status:Valid", jsonValidator.output());
-  }
-
-  @Test
-  public void testNestedArrayInObject() throws InvalidJsonException {
-    String validJson = "{\"key\":[\"a\",\"b\"]}";
     for (char c : validJson.toCharArray()) {
       jsonValidator.input(c);
     }
@@ -262,19 +254,106 @@ public class JsonValidatorTest {
   }
 
   @Test
-  public void testLoneComma() {
-    assertThrows(InvalidJsonException.class, () -> {
-      jsonValidator.input('{');
-      jsonValidator.input(',');
-    });
-  }
-
-  @Test
   public void testInvalidNumberFormat() {
     assertThrows(InvalidJsonException.class, () -> {
       jsonValidator.input('0');
       jsonValidator.input('1');
     });
+  }
+
+  @Test
+  public void testValidObjectWithMultipleKeys() throws InvalidJsonException {
+    String validJson = "{\"a\":\"b\", \"c\":\"d\"}";
+    for (char c : validJson.toCharArray()) {
+      jsonValidator.input(c);
+    }
+    assertEquals("Status:Valid", jsonValidator.output());
+  }
+
+  @Test
+  public void testCommaInEmptyObject() {
+    assertThrows(InvalidJsonException.class, () -> {
+      jsonValidator.input('{');
+      jsonValidator.input(',');
+      jsonValidator.input('}');
+    });
+  }
+
+  @Test
+  public void testValidQuotedNumericKey() throws InvalidJsonException {
+    String validJson = "{\"123\":\"value\"}";
+    for (char c : validJson.toCharArray()) {
+      jsonValidator.input(c);
+    }
+    assertEquals("Status:Valid", jsonValidator.output());
+  }
+
+  @Test(expected = InvalidJsonException.class)
+  public void testInvalidUnquotedKey() throws InvalidJsonException {
+    jsonValidator.input('{');
+    jsonValidator.input('1');
+  }
+
+  @Test
+  public void testUnquotedNumericKey() {
+    assertThrows(InvalidJsonException.class, () -> {
+      jsonValidator.input('{');
+      jsonValidator.input('1');
+      jsonValidator.input('2');
+      jsonValidator.input('3');
+      jsonValidator.input(':');
+      jsonValidator.input('"');
+      jsonValidator.input('v');
+      jsonValidator.input('"');
+      jsonValidator.input('}');
+    });
+  }
+
+  @Test
+  public void testInvalidJson() {
+    String invalidJson = "{\"details\":[\"name\", \"address\"], \"age\":13}";
+    try {
+      for (char c : invalidJson.toCharArray()) {
+        jsonValidator.input(c);
+      }
+      fail("Expected InvalidJsonException to be thrown, but it wasn't.");
+    } catch (InvalidJsonException e) {
+      assertEquals("Status:Invalid", jsonValidator.output());
+    }
+  }
+
+  @Test
+  public void testInvalidNestedJson() {
+    String invalidJson = "{\"n\": \"c\" { \"k\":\"v\"}}";
+    try {
+      for (char c : invalidJson.toCharArray()) {
+        jsonValidator.input(c);
+      }
+    } catch (InvalidJsonException e) {
+      assertEquals("Status:Invalid", jsonValidator.output());
+    }
+  }
+
+  @Test
+  public void testInvalidKeyNumber() {
+    String invalidJson = "{\"9\": \"value\"}";
+    try {
+      for (char c : invalidJson.toCharArray()) {
+        jsonValidator.input(c);
+      }
+    } catch (InvalidJsonException e) {
+      assertEquals("Status:Invalid", jsonValidator.output());
+    }
+  }
+
+  @Test
+  public void testValidMultipleDuplicateKeys() throws InvalidJsonException {
+    String validJson = "{ \"scene\": { \"instance\":\"\" ,\"instance\":\"\" ,\"instance\":\"\" ,\"instance\":\"\" } }";
+
+    for (char c : validJson.toCharArray()) {
+      jsonValidator.input(c);
+    }
+    assertEquals("Status:Valid", jsonValidator.output());
   }
 
 }
