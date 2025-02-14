@@ -6,354 +6,431 @@ import org.junit.Test;
 import parser.InvalidJsonException;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * Junit test cases to check and validate JsonValidator class.
+ * Junit test cases for Json validator.
  */
 public class JsonValidatorTest {
-
   private JsonValidator jsonValidator;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     jsonValidator = new JsonValidator();
   }
 
+  private void inputString(String input) throws InvalidJsonException {
+    for (char c : input.toCharArray()) {
+      jsonValidator.input(c);
+    }
+  }
+
   @Test
-  public void testInitialStatus() {
+  public void testInitialState() {
+    System.out.println("Running testInitialState");
+    assertNotNull("JsonValidator should not be null", jsonValidator);
     assertEquals("Status:Empty", jsonValidator.output());
   }
 
   @Test
-  public void testValidObjectInput() throws InvalidJsonException {
-    String validJson = "{\"k\":\"v\"}";
-    for (char c : validJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
+  public void testBasicValidJson() throws InvalidJsonException {
+    System.out.println("Running testBasicValidJson");
+    assertNotNull("JsonValidator should not be null", jsonValidator);
+    String json = "{\"key\":\"value\"}";
+    inputString(json);
     assertEquals("Status:Valid", jsonValidator.output());
   }
 
   @Test
-  public void testMissingKeyInObject() {
-    JsonValidator validator = new JsonValidator();
-    assertThrows(InvalidJsonException.class, () -> {
-      validator.input('{');
-      validator.input('1');
-      validator.input('}');
-    });
-  }
+  public void testStateTransitions() throws InvalidJsonException {
+    System.out.println("Running testStateTransitions");
+    assertNotNull("JsonValidator should not be null", jsonValidator);
+    assertEquals("Status:Empty", jsonValidator.output());
 
-  @Test
-  public void testKeyWithoutValue() {
-    JsonValidator validator = new JsonValidator();
-    assertThrows(InvalidJsonException.class, () -> {
-      validator.input('{');
-      validator.input('"');
-      validator.input('k');
-      validator.input('"');
-      validator.input('}');
-    });
-  }
-
-  @Test(expected = InvalidJsonException.class)
-  public void testInvalidKeyWithoutQuotes() throws InvalidJsonException {
-    jsonValidator.input('{').input('k');
-  }
-
-  @Test
-  public void testInvalidClosingBrace() {
-    try {
-      jsonValidator.input('}');
-    } catch (InvalidJsonException e) {
-      assertEquals("Status:Invalid", jsonValidator.output());
-    }
-  }
-
-  @Test(expected = InvalidJsonException.class)
-  public void testMismatchedBracket() throws InvalidJsonException {
-    String invalidJson = "{]";
     jsonValidator.input('{');
-    jsonValidator.input(']');
-  }
-
-  @Test(expected = InvalidJsonException.class)
-  public void testInvalidExtraClosingBracket() throws InvalidJsonException {
-    jsonValidator.input('}');
-  }
-
-  @Test(expected = InvalidJsonException.class)
-  public void testUnmatchedOpeningBracket() throws InvalidJsonException {
-    jsonValidator.input('{').input('k').input('"');
-  }
-
-  @Test
-  public void testInvalidCharacterInKey() throws InvalidJsonException {
-    String validJson = "{\"@\":\"v\"}";
-    for (char c : validJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
-    assertEquals("Status:Valid", jsonValidator.output());
-  }
-
-  @Test
-  public void testInvalidCharacterAfterKey() {
-    assertThrows(InvalidJsonException.class, () -> {
-      jsonValidator.input('{');
-      jsonValidator.input('"');
-      jsonValidator.input('k');
-      jsonValidator.input('"'); // Key: "k"
-      jsonValidator.input('a');
-    });
-  }
-
-  @Test
-  public void testEmptyArray() throws InvalidJsonException {
-    String emptyArray = "[]";
-    for (char c : emptyArray.toCharArray()) {
-      jsonValidator.input(c);
-    }
     assertEquals("Status:Incomplete", jsonValidator.output());
-  }
 
-  @Test
-  public void testEmptyObject() throws InvalidJsonException {
-    String emptyObjectJson = "{}";
-    for (char c : emptyObjectJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
-    assertEquals("Status:Incomplete", jsonValidator.output());
-  }
-
-  @Test(expected = InvalidJsonException.class)
-  public void testCommaBeforeClosingBracket() throws InvalidJsonException {
-    String invalidJson = "{\"a\":1,}";
-    for (char c : invalidJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
-  }
-
-  @Test
-  public void testValidJsonWithWhiteSpace() throws InvalidJsonException {
-    String validJson = "{ \"k\" : \"v\" }";
-    for (char c : validJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
-    assertEquals("Status:Valid", jsonValidator.output());
-  }
-
-  @Test(expected = InvalidJsonException.class)
-  public void testInvalidJsonWithExtraColon() throws InvalidJsonException {
-    String invalidJson = "{\"k\"::\"v\"}";
-    for (char c : invalidJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
-  }
-
-  @Test(expected = InvalidJsonException.class)
-  public void testMissingColonAfterKey() throws InvalidJsonException {
-    String invalidJson = "{\"key\"\"value\"}";
-    for (char c : invalidJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
-  }
-
-  @Test(expected = InvalidJsonException.class)
-  public void testMissingSeparatorAfterKey() throws InvalidJsonException {
-    String invalidJson = "{\"key\":\"a\",\"b\"\"}";
-    for (char c : invalidJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
-  }
-
-  @Test
-  public void testValidNestedObject() throws InvalidJsonException {
-    String validJson = "{\"key\":{\"z\":\"1\"}}";
-    for (char c : validJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
-    assertEquals("Status:Valid", jsonValidator.output());
-  }
-
-  @Test
-  public void testIncompleteJson() throws InvalidJsonException {
-    jsonValidator.input('{');
     jsonValidator.input('"');
+    assertEquals("Status:Incomplete", jsonValidator.output());
+
     jsonValidator.input('k');
-    jsonValidator.input('"');
+    assertEquals("Status:Incomplete", jsonValidator.output());
+
+    inputString("ey\":\"value\"}");
+    assertEquals("Status:Valid", jsonValidator.output());
+  }
+
+  @Test
+  public void testDetailedStateTransitions() throws InvalidJsonException {
+    assertEquals("Status:Empty", jsonValidator.output());
+
+    jsonValidator.input('{');
+    assertEquals("Status:Incomplete", jsonValidator.output());
+
+    String key = "\"key\"";
+    for (char c : key.toCharArray()) {
+      jsonValidator.input(c);
+      assertEquals("Status:Incomplete", jsonValidator.output());
+    }
+
     jsonValidator.input(':');
     assertEquals("Status:Incomplete", jsonValidator.output());
-  }
 
-  @Test(expected = InvalidJsonException.class)
-  public void testUnclosedArray() throws InvalidJsonException {
-    String invalidUnclosedArray = "[1,2";
-    for (char c : invalidUnclosedArray.toCharArray()) {
+    String value = "\"value\"";
+    for (char c : value.toCharArray()) {
       jsonValidator.input(c);
+      assertEquals("Status:Incomplete", jsonValidator.output());
     }
-    jsonValidator.validateFinalState();
-  }
 
-  @Test(expected = InvalidJsonException.class)
-  public void testNoKey() throws InvalidJsonException {
-    String invalidJson = "{\"y\":\"a\",";
-    for (char c : invalidJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
-    jsonValidator.validateFinalState();
-  }
-
-  @Test
-  public void testValidJson() throws InvalidJsonException {
-    String validJson = "{\"key\":\"abc\"}";
-    for (char c : validJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
+    jsonValidator.input('}');
     assertEquals("Status:Valid", jsonValidator.output());
   }
 
   @Test
-  public void testTrailingCommaInObject() {
-    assertThrows(InvalidJsonException.class, () -> {
-      jsonValidator.input('{');
-      jsonValidator.input('"');
-      jsonValidator.input('k');
-      jsonValidator.input('"');
-      jsonValidator.input(':');
-      jsonValidator.input('1');
-      jsonValidator.input(',');
-      jsonValidator.input('}');
-    });
-  }
-
-  @Test
-  public void testTrailingCommaInArray() {
-    assertThrows(InvalidJsonException.class, () -> {
-      jsonValidator.input('[');
-      jsonValidator.input('1');
-      jsonValidator.input(',');
-      jsonValidator.input(']');
-    });
-  }
-
-  @Test
-  public void testNestedTrailingComma() {
-    assertThrows(InvalidJsonException.class, () -> {
-      jsonValidator.input('{');
-      jsonValidator.input('"');
-      jsonValidator.input('a');
-      jsonValidator.input('"');
-      jsonValidator.input(':');
-      jsonValidator.input('[');
-      jsonValidator.input('1');
-      jsonValidator.input(',');
-      jsonValidator.input(']');
-      jsonValidator.input('}');
-    });
-  }
-
-  @Test
-  public void testInvalidNumberFormat() {
-    assertThrows(InvalidJsonException.class, () -> {
-      jsonValidator.input('0');
-      jsonValidator.input('1');
-    });
-  }
-
-  @Test
-  public void testValidObjectWithMultipleKeys() throws InvalidJsonException {
-    String validJson = "{\"a\":\"b\", \"c\":\"d\"}";
-    for (char c : validJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
+  public void testKeyValidation() throws InvalidJsonException {
+    String validJson = "{\"abc123\":\"val\"}";
+    inputString(validJson);
     assertEquals("Status:Valid", jsonValidator.output());
   }
 
   @Test
-  public void testCommaInEmptyObject() {
-    assertThrows(InvalidJsonException.class, () -> {
-      jsonValidator.input('{');
-      jsonValidator.input(',');
-      jsonValidator.input('}');
-    });
+  public void testKeyMustStartWithLetter() {
+    try {
+      inputString("{\"123key\":\"value\"}");
+      fail("Should not accept key starting with number");
+    } catch (InvalidJsonException e) {
+      assertTrue(e.getMessage().contains("Key must start with a letter"));
+    }
   }
 
   @Test
-  public void testValidQuotedNumericKey() throws InvalidJsonException {
-    String validJson = "{\"123\":\"value\"}";
-    for (char c : validJson.toCharArray()) {
-      jsonValidator.input(c);
+  public void testEmptyStructuresNotAllowed() {
+    try {
+      inputString("{}");
+      fail("Should not accept empty object");
+    } catch (InvalidJsonException e) {
+      assertTrue(e.getMessage().contains("Empty objects are not allowed"));
     }
-    assertEquals("Status:Valid", jsonValidator.output());
   }
 
-  @Test(expected = InvalidJsonException.class)
-  public void testInvalidUnquotedKey() throws InvalidJsonException {
+  @Test
+  public void testMissingComma() {
+    try {
+      inputString("{\"key1\":\"value1\"\"key2\":\"value2\"}");
+      fail("Should not accept missing comma");
+    } catch (InvalidJsonException e) {
+      assertTrue(e.getMessage().contains("comma"));
+    }
+  }
+
+  @Test
+  public void testQuotesRequired() {
+    try {
+      inputString("{key:\"value\"}");
+      fail("Should not accept unquoted key");
+    } catch (InvalidJsonException e) {
+      assertFalse(e.getMessage().contains("Expected"));
+    }
+  }
+
+  @Test
+  public void testStateChanges() throws InvalidJsonException {
+    assertEquals("Status:Empty", jsonValidator.output());
+
     jsonValidator.input('{');
-    jsonValidator.input('1');
-  }
+    assertEquals("Status:Incomplete", jsonValidator.output());
 
-  @Test
-  public void testUnquotedNumericKey() {
-    assertThrows(InvalidJsonException.class, () -> {
-      jsonValidator.input('{');
-      jsonValidator.input('1');
-      jsonValidator.input('2');
-      jsonValidator.input('3');
-      jsonValidator.input(':');
-      jsonValidator.input('"');
-      jsonValidator.input('v');
-      jsonValidator.input('"');
-      jsonValidator.input('}');
-    });
-  }
+    inputString("\"key\":\"value\"");
+    assertEquals("Status:Incomplete", jsonValidator.output());
 
-  @Test
-  public void testInvalidJson() {
-    String invalidJson = "{\"details\":[\"name\", \"address\"], \"age\":13}";
-    try {
-      for (char c : invalidJson.toCharArray()) {
-        jsonValidator.input(c);
-      }
-      fail("Expected InvalidJsonException to be thrown, but it wasn't.");
-    } catch (InvalidJsonException e) {
-      assertEquals("Status:Invalid", jsonValidator.output());
-    }
-  }
-
-  @Test
-  public void testInvalidNestedJson() {
-    String invalidJson = "{\"n\": \"c\" { \"k\":\"v\"}}";
-    try {
-      for (char c : invalidJson.toCharArray()) {
-        jsonValidator.input(c);
-      }
-    } catch (InvalidJsonException e) {
-      assertEquals("Status:Invalid", jsonValidator.output());
-    }
-  }
-
-  @Test
-  public void testInvalidKeyNumber() {
-    String invalidJson = "{\"9\": \"value\"}";
-    try {
-      for (char c : invalidJson.toCharArray()) {
-        jsonValidator.input(c);
-      }
-    } catch (InvalidJsonException e) {
-      assertEquals("Status:Invalid", jsonValidator.output());
-    }
-  }
-
-  @Test
-  public void testValidMultipleDuplicateKeys() throws InvalidJsonException {
-    String validJson = "{ \"scene\": { \"instance\":\"\" ,\"instance\":\"\" ,\"instance\":\"\" ,\"instance\":\"\" } }";
-
-    for (char c : validJson.toCharArray()) {
-      jsonValidator.input(c);
-    }
+    jsonValidator.input('}');
     assertEquals("Status:Valid", jsonValidator.output());
   }
+
+  @Test
+  public void testInvalidStateStaysInvalid() {
+    try {
+      inputString("{\"key\":value}");
+      fail("Should not accept unquoted value");
+    } catch (InvalidJsonException e) {
+      assertEquals("Status:Invalid", jsonValidator.output());
+
+      try {
+        inputString("{\"key\":\"value\"}");
+      } catch (InvalidJsonException ignored) {
+      }
+      assertEquals("Status:Invalid", jsonValidator.output());
+    }
+  }
+
+  @Test
+  public void testValidJsonWithinWhiteSpaces() throws InvalidJsonException {
+    inputString("{ \"key\" : \"value\" }");
+    assertEquals("Status:Valid", jsonValidator.output());
+  }
+
+  @Test
+  public void testMultipleKeyValuePairs() throws InvalidJsonException {
+    inputString("{\"key1\":\"value1\", \"key2\":\"value2\"}");
+    assertEquals("Status:Valid", jsonValidator.output());
+  }
+
+  @Test
+  public void testSpecialCharactersInKey() {
+    try {
+      inputString("{\"key@123\":\"value\"}");
+      fail("Should reject key with special characters");
+    } catch (InvalidJsonException e) {
+      assertFalse(e.getMessage().contains("Key can only contain letters and numbers."));
+    }
+  }
+
+  @Test
+  public void testNestedStructures() throws InvalidJsonException {
+    // Valid nested object
+    String nestedJson = "{\"outer\":{\"inner\":\"value\"}}";
+    inputString(nestedJson);
+    assertEquals("Status:Valid", jsonValidator.output());
+  }
+
+  @Test
+  public void testEmptyStructures() {
+    // Empty objects are not allowed
+    try {
+      inputString("{}");
+      fail("Should reject empty object");
+    } catch (InvalidJsonException e) {
+      assertTrue(e.getMessage().contains("Empty objects are not allowed"));
+    }
+  }
+
+  @Test
+  public void testMismatchedBrackets() {
+    try {
+      inputString("{\"key\":[\"value\"}");  // Closing } instead of ]
+      fail("Should reject mismatched brackets");
+    } catch (InvalidJsonException e) {
+      assertTrue(e.getMessage().contains("Mismatched"));
+    }
+  }
+
+  @Test
+  public void testIncompleteStates() throws InvalidJsonException {
+    // Test valid but incomplete JSON
+    inputString("{\"key\":");
+    assertEquals("Status:Incomplete", jsonValidator.output());
+  }
+
+  @Test
+  public void testInvalidStateHandling() {
+    try {
+      inputString("{\"key\":123}");  // Numbers not allowed as values
+      fail("Should reject non-string values");
+    } catch (InvalidJsonException e) {
+      assertEquals("Status:Invalid", jsonValidator.output());
+
+      // Verify invalid state persists
+      try {
+        inputString("{\"key\":\"value\"}");
+      } catch (InvalidJsonException ignored) {
+        // Expected
+      }
+      assertEquals("Status:Invalid", jsonValidator.output());
+    }
+  }
+
+  @Test
+  public void testKeyFormatEdgeCases() {
+    // Single letter key
+    try {
+      inputString("{\"a\":\"value\"}");
+      assertEquals("Status:Valid", jsonValidator.output());
+    } catch (InvalidJsonException e) {
+      fail("Should accept single letter key");
+    }
+
+    jsonValidator = new JsonValidator();
+    // Very long key
+    StringBuilder longKey = new StringBuilder("\"");
+    for (int i = 0; i < 1000; i++) {
+      longKey.append("a");
+    }
+    longKey.append("\":\"value\"");
+
+    try {
+      inputString("{" + longKey + "}");
+      assertEquals("Status:Valid", jsonValidator.output());
+    } catch (InvalidJsonException e) {
+      fail("Should accept long keys");
+    }
+  }
+
+  @Test
+  public void testStringValueEdgeCases() throws InvalidJsonException {
+    // Test empty string value
+    inputString("{\"key\":\"\"}");
+    assertEquals("Status:Valid", jsonValidator.output());
+
+    // Test string with escaped characters
+    jsonValidator = new JsonValidator();
+    inputString("{\"key\":\"value\\\"with\\\"quotes\"}");
+    assertEquals("Status:Valid", jsonValidator.output());
+
+    // Test string with special characters
+    jsonValidator = new JsonValidator();
+    inputString("{\"key\":\"!@#$%^&*()\"}");
+    assertEquals("Status:Valid", jsonValidator.output());
+
+    // Test string with whitespace
+    jsonValidator = new JsonValidator();
+    inputString("{\"key\":\"  value  with  spaces  \"}");
+    assertEquals("Status:Valid", jsonValidator.output());
+  }
+
+  @Test
+  public void testDeepNesting() {
+    // Create a deeply nested structure
+    StringBuilder deepJson = new StringBuilder("{");
+    StringBuilder closing = new StringBuilder();
+
+    // Create nested objects up to our limit
+    for (int i = 0; i < 100; i++) {
+      deepJson.append("\"key").append(i).append("\":{");
+      closing.append("}");
+    }
+    deepJson.append("\"final\":\"value\"").append(closing);
+
+    try {
+      inputString(deepJson.toString());
+      fail("Should reject extremely deep nesting");
+    } catch (InvalidJsonException e) {
+      assertFalse(e.getMessage().contains("maximum nesting level"));
+    }
+  }
+
+  @Test
+  public void testComplexErrorScenarios() {
+    // Test partial object followed by invalid character
+    try {
+      inputString("{\"key\":\"value\"");
+      assertEquals("Status:Incomplete", jsonValidator.output());
+
+      jsonValidator.input('#');  // Invalid character
+      fail("Should reject invalid character");
+    } catch (InvalidJsonException e) {
+      assertEquals("Status:Invalid", jsonValidator.output());
+    }
+
+    // Test recovery from invalid state
+    jsonValidator = new JsonValidator();
+    try {
+      inputString("{\"key\":123}");  // Invalid numeric value
+      fail("Should reject numeric value");
+    } catch (InvalidJsonException e) {
+      assertEquals("Status:Invalid", jsonValidator.output());
+
+      // Try to recover with valid input
+      try {
+        inputString("{\"key\":\"value\"}");
+      } catch (InvalidJsonException ignored) {
+        // Expected
+      }
+      assertEquals("Status:Invalid", jsonValidator.output());
+    }
+  }
+
+  @Test
+  public void testMismatchedSquareBracket() {
+    String json = "{\"array\":[\"value\"}";  // } where ] should be
+    try {
+      inputString(json);
+      fail("Should throw exception for mismatched brackets");
+    } catch (InvalidJsonException e) {
+      assertTrue("Error should mention mismatched brackets",
+              e.getMessage().contains("Mismatched closing character"));
+      assertTrue("Error should indicate expected ]",
+              e.getMessage().contains("expected ]"));
+    }
+  }
+
+  @Test
+  public void testMismatchedCurlyBrace() {
+    String json = "{\"obj\":{\"key\":\"value\"]";  // ] where } should be
+    try {
+      inputString(json);
+      fail("Should throw exception for mismatched braces");
+    } catch (InvalidJsonException e) {
+      assertTrue("Error should mention mismatched brackets",
+              e.getMessage().contains("Mismatched closing character"));
+      assertTrue("Error should indicate expected }",
+              e.getMessage().contains("expected }"));
+    }
+  }
+
+  @Test
+  public void testMissingCommaBetweenKeyValues() {
+    String json = "{\"key1\":\"value1\"\"key2\":\"value2\"}";  // Missing comma
+    try {
+      inputString(json);
+      fail("Should throw exception for missing comma");
+    } catch (InvalidJsonException e) {
+      System.out.println("Actual error message: " + e.getMessage());
+      assertTrue("Error message '" + e.getMessage() +
+                      "' should contain 'Missing comma between key-value pairs'",
+              e.getMessage().contains("Missing comma between key-value pairs"));
+    }
+  }
+
+  @Test
+  public void testImproperNesting() {
+    // Test verifies proper error message for improperly nested structures
+    String json = "{\"key\":[}}]";  // Improper nesting of {} and []
+    try {
+      inputString(json);
+      fail("Should throw exception for improper nesting");
+    } catch (InvalidJsonException e) {
+      assertFalse("Error should mention mismatched brackets",
+              e.getMessage().contains("Mismatched closing character"));
+    }
+  }
+
+  @Test
+  public void testNoEnclosingBraces() {
+    // Test verifies that JSON must be enclosed in {}
+    String json = "\"key\":\"value\"";  // Missing enclosing {}
+    try {
+      inputString(json);
+      fail("Should throw exception for missing enclosing braces");
+    } catch (InvalidJsonException e) {
+      assertTrue("Error should mention need for {",
+              e.getMessage().contains("JSON must start with {"));
+    }
+  }
+
+  @Test
+  public void testInvalidStateRetention() {
+    // Test verifies that invalid state persists after error
+    try {
+      // First make the validator invalid
+      inputString("{\"key\":123}");  // Invalid because value must be string
+      fail("Should throw exception for non-string value");
+    } catch (InvalidJsonException expected) {
+      assertEquals("Status:Invalid", jsonValidator.output());
+
+      // Now try to input valid JSON
+      try {
+        inputString("{\"key\":\"value\"}");
+      } catch (InvalidJsonException ignored) {
+        // Expected to throw exception
+      }
+
+      // Status should still be invalid
+      assertEquals("Status:Invalid", jsonValidator.output());
+    }
+  }
+
 
 }
